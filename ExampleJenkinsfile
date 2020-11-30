@@ -1,0 +1,47 @@
+pipeline {
+    agent any
+
+    environment {
+        timestamp = new java.util.Date().format("yyyyMMdd-HHmm", TimeZone.getTimeZone('Asia/Shanghai'));
+        scheduler_job_name = "serialized-scheduler";
+    }
+
+    options {
+        buildDiscarder(logRotator(artifactDaysToKeepStr: "7", artifactNumToKeepStr: "5", daysToKeepStr: "7", numToKeepStr: "5"))
+        disableConcurrentBuilds()
+        skipDefaultCheckout()
+        timestamps()
+    }
+
+    triggers {
+        cron('H 12 * * *');
+    }
+
+    stages {
+        stage("Scheduling My Jobs") {
+            steps {
+                script {
+                    echo "starting full executor scheduling"
+
+                    def nightly_jobs = ["my-job1", "my-job2", "my-job3"] as String[];
+                    def job_string = nightly_jobs.toString().substring(1, nightly_jobs.toString().length() - 1);
+                    build job: "${scheduler_job_name}",
+                            parameters: [string(name: 'nodeLabel', value: "Windows_JDK8"),
+                                         string(name: 'targetJobs', value: "${job_string}")],
+                            wait: false
+                }
+            }
+        }
+    }
+    post {
+        always {
+            script {
+                try {
+                    echo "build completed ${currentBuild.result}"
+                } finally {
+                    deleteDir()
+                }
+            }
+        }
+    }
+}
